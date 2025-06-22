@@ -19,7 +19,7 @@ Ensure you have the following installed on your system:
 1. Clone this repository or download the project files.
 2. Navigate to the project directory:
    ```bash
-   cd tata-steel-stock-prediction
+   cd Stock_price_prediction
    ```
 3. Install the required dependencies:
    ```bash

@@ -1,7 +1,8 @@
-tensorflow
-yfinance
-scikit-learn
-matplotlib
-pandas
+streamlit
+tensorflow==2.12.0
 numpy
-keras
+pandas
+joblib
+yfinance
+matplotlib
+scikit-learn

@@ -73,11 +73,18 @@ if st.button("Predict"):
                 future_predictions.append(prediction[0, 0])
                 current_sequence = np.append(current_sequence[1:], prediction, axis=0)
 
-            # Transform predictions back to original scale
+            # Ensure future_predictions is reshaped to (num_days, 1)
             future_predictions = np.array(future_predictions).reshape(-1, 1)
-            dummy_features = np.zeros((future_predictions.shape[0], 3))  # Add dummy columns
+
+            # Ensure dummy features have the correct shape: (num_days, 3)
+            dummy_features = np.zeros((future_predictions.shape[0], 3))
+
+            # Concatenate predictions with dummy features
             full_features = np.concatenate((future_predictions, dummy_features), axis=1)
+
+            # Perform inverse transformation
             future_predictions_rescaled = scaler.inverse_transform(full_features)[:, 0]  # Extract the 'Close' column
+
 
 
             # Generate future dates

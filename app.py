@@ -50,7 +50,7 @@ if st.button("Predict"):
             st.pyplot(fig)
 
              # Load pre-trained model and scaler
-            model = load_model('stock_price_lstm_model.h5')
+            model = load_model('tata_steel_model.h5')
             scaler = joblib.load('scaler.pkl')
 
             # Fetch stock data

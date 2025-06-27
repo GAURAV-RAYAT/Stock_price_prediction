@@ -7,6 +7,17 @@ import joblib
 import yfinance as yf
 import matplotlib.pyplot as plt
 
+# Function to calculate RSI
+def calculate_rsi(data, window=14):
+    delta = data.diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(window=window, min_periods=1).mean()
+    avg_loss = loss.rolling(window=window, min_periods=1).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
 # Title and description
 st.title("Tata Steel Stock Price Prediction")
 st.markdown("""
@@ -21,7 +32,7 @@ stock_symbol = 'TATASTEEL.NS'
 num_days = st.number_input("Enter the number of future days to predict:", min_value=1, max_value=30, value=10, step=1)
 
 # Fetch data and predict
-if st.button("Fetch Data and Predict"):
+if st.button("Predict"):
     with st.spinner("Fetching data and making predictions..."):
         try:
             # Fetch historical data
@@ -38,56 +49,57 @@ if st.button("Fetch Data and Predict"):
             ax.legend()
             st.pyplot(fig)
 
-            # Load the saved scaler
+             # Load pre-trained model and scaler
+            model = load_model('stock_price_lstm_model.h5')
             scaler = joblib.load('scaler.pkl')
 
-            # Preprocess data using the loaded scaler
-            scaled_data = scaler.transform(data['Close'].values.reshape(-1, 1))
+            # Fetch stock data
+            data['RSI'] = calculate_rsi(data['Close'])
+            data['MA_20'] = data['Close'].rolling(window=20).mean()
+            data = data.dropna()
 
-            # Load the trained model
-            model = load_model('tata_steel_model.h5')
+            # Scale features
+            features = data[['Close', 'RSI', 'MA_20', 'Volume']]
+            scaled_data = scaler.transform(features)
 
-            # Prepare the last 60 days of data from the entire dataset for prediction
+            # Prepare sequences for prediction
             sequence_length = 60
             last_sequence = scaled_data[-sequence_length:]
             current_sequence = last_sequence
             future_predictions = []
 
-            # Predict for the specified number of future days
             for _ in range(num_days):
-                prediction = model.predict(current_sequence.reshape(1, sequence_length, 1))
+                prediction = model.predict(current_sequence.reshape(1, sequence_length, 4))
                 future_predictions.append(prediction[0, 0])
                 current_sequence = np.append(current_sequence[1:], prediction, axis=0)
 
-            # Transform predictions back to original scale
-            future_predictions = scaler.inverse_transform(np.array(future_predictions).reshape(-1, 1))
+            # Inverse transform predictions
+            future_predictions = scaler.inverse_transform(
+                np.concatenate((np.array(future_predictions).reshape(-1, 1), np.zeros((num_days, 3))), axis=1)
+            )[:, 0]  # Extract 'Close' column
 
             # Generate future dates
             last_date = data.index[-1]
             future_dates = [last_date + pd.Timedelta(days=i) for i in range(1, num_days + 1)]
 
             # Display predictions
-            st.subheader(f"Predicted Prices for the Next {num_days} Days")
+            st.subheader("Predicted Prices")
             predicted_data = pd.DataFrame({
                 'Date': future_dates,
-                'Predicted Price': future_predictions.flatten()
+                'Predicted Price': future_predictions
             })
             st.write(predicted_data)
 
-            # Combine historical data with predictions for visualization
-            combined_dates = list(data.index) + future_dates
-            combined_prices = list(data['Close'].values) + list(future_predictions.flatten())
-
-            # Plot combined graph
-            st.subheader("Historical and Predicted Prices")
-            fig, ax = plt.subplots(figsize=(12, 6))
-            ax.plot(combined_dates[:len(data)], combined_prices[:len(data)], label='Historical Prices', color='blue')
-            ax.plot(combined_dates[len(data):], combined_prices[len(data):], label='Predicted Prices', color='red')
-            ax.set_title("Historical and Predicted Prices", fontsize=16)
-            ax.set_xlabel("Date", fontsize=12)
-            ax.set_ylabel("Stock Price", fontsize=12)
-            ax.legend()
-            st.pyplot(fig)
+            # Visualize predictions
+            st.subheader("Actual and Predicted Prices")
+            plt.figure(figsize=(14, 7))
+            plt.plot(data.index[-sequence_length:], data['Close'][-sequence_length:], label="Actual Prices", color="blue")
+            plt.plot(future_dates, future_predictions, label="Predicted Prices", color="orange")
+            plt.title(f"{stock_symbol} Price Prediction")
+            plt.xlabel("Date")
+            plt.ylabel("Price")
+            plt.legend()
+            st.pyplot(plt)
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
